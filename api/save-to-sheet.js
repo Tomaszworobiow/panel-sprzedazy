@@ -8,13 +8,13 @@ export default async function handler(req, res) {
   try {
     const { sheetName, data } = req.body;
 
-    // NOWA METODA DEKODOWANIA KLUCZA
-    const privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY, 'base64').toString('utf8');
+    // Upewniamy się, że klucz jest poprawnie formatowany
+    const privateKey = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
 
     const auth = new google.auth.GoogleAuth({
       credentials: {
         client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: privateKey, // Używamy odkodowanego klucza
+        private_key: privateKey,
       },
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
@@ -32,7 +32,10 @@ export default async function handler(req, res) {
 
     res.status(200).json({ message: 'Success' });
   } catch (error) {
-    console.error('Error saving to sheet:', error.message);
-    res.status(500).json({ error: 'Failed to save data to sheet' });
+    console.error('BŁĄD ZAPISU DO ARKUSZA:', error.message);
+    res.status(500).json({ 
+      error: 'Nie udało się zapisać danych do arkusza.', 
+      details: error.message 
+    });
   }
 }
