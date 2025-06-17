@@ -55,10 +55,22 @@ const ConfirmationModal = ({ title, message, onConfirm, onCancel }) => (
     </div>
 );
 
+// --- HELPER FUNCTION FOR GOOGLE SHEETS ---
+const saveDataToSheet = (sheetName, data) => {
+    fetch('/api/save-to-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sheetName, data }),
+    })
+    .then(response => response.json())
+    .then(result => console.log(`Zapisano w ${sheetName}:`, result))
+    .catch(err => console.error(`Błąd zapisu do ${sheetName}:`, err));
+}
+
 // --- PAGE COMPONENTS ---
 
 const Dashboard = ({ orders, customers, products, theme, setActivePage }) => {
-    const { totalRevenue, profit, salesData, sellerData, productSalesData } = useMemo(() => {
+    const { totalRevenue, profit, salesData, productSalesData } = useMemo(() => {
         const relevantOrders = orders.filter(o => ['Opłacone', 'Zakończone', 'Wysłane'].includes(o.fulfillmentStatus));
         const revenue = relevantOrders.reduce((sum, order) => sum + order.total, 0);
         const cost = relevantOrders.flatMap(o => o.products || []).reduce((sum, item) => {
@@ -245,17 +257,46 @@ const Orders = ({ orders, setOrders, products, setCustomers }) => {
     const closeForm = () => { setSelectedOrder(null); setIsFormOpen(false); };
     
     const handleSaveOrder = (orderData) => {
-        setCustomers(prev => {
-            const customerExists = prev.some(c => c.name.toLowerCase() === orderData.customerName.toLowerCase());
-            if (!customerExists) return [...prev, { id: `CUST-${Date.now()}`, name: orderData.customerName, email: '' }];
-            return prev;
+        // Handle Customer
+        setCustomers(prevCustomers => {
+            const customerExists = prevCustomers.some(c => c.name.toLowerCase() === orderData.customerName.toLowerCase());
+            if (!customerExists) {
+                const newCustomer = { id: `CUST-${Date.now()}`, name: orderData.customerName, email: '' };
+                const sheetData = [newCustomer.id, newCustomer.name, newCustomer.email, 0, 0];
+                saveDataToSheet('Klienci', sheetData);
+                return [...prevCustomers, newCustomer];
+            }
+            return prevCustomers;
         });
+
+        // Handle Order
         const total = orderData.products.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        let finalOrder;
         if (selectedOrder) {
-            setOrders(orders.map(o => o.id === selectedOrder.id ? { ...o, ...orderData, total } : o));
+            // NOTE: Editing an order does not update the sheet in this version.
+            finalOrder = { ...selectedOrder, ...orderData, total };
+            setOrders(orders.map(o => o.id === selectedOrder.id ? finalOrder : o));
         } else {
-            const newOrder = { id: `ZAM-${String(orders.length + 1).padStart(4, '0')}`, date: new Date().toISOString().split('T')[0], paymentStatus: 'Oczekuje na płatność', fulfillmentStatus: 'Nowe', ...orderData, total };
-            setOrders(prev => [newOrder, ...prev]);
+            finalOrder = { 
+                id: `ZAM-${String(orders.length + 1).padStart(4, '0')}`, 
+                date: new Date().toISOString().split('T')[0], 
+                paymentStatus: 'Oczekuje na płatność', 
+                fulfillmentStatus: 'Nowe', 
+                ...orderData, 
+                total 
+            };
+            const sheetData = [
+                finalOrder.id,
+                finalOrder.customerName,
+                finalOrder.seller,
+                finalOrder.date,
+                finalOrder.total,
+                finalOrder.paymentStatus,
+                finalOrder.fulfillmentStatus,
+                JSON.stringify(finalOrder.products)
+            ];
+            saveDataToSheet('Zamówienia', sheetData);
+            setOrders(prev => [finalOrder, ...prev]);
         }
     };
     
@@ -265,11 +306,15 @@ const Orders = ({ orders, setOrders, products, setCustomers }) => {
     };
     
     const handleDeleteOrder = (orderId) => {
+        // NOTE: Deleting an order does not update the sheet in this version.
         setOrders(prev => prev.filter(o => o.id !== orderId));
         setOrderToDelete(null);
     };
 
-    const handleStatusChange = (orderId, newStatus) => setOrders(orders.map(o => o.id === orderId ? { ...o, fulfillmentStatus: newStatus } : o));
+    const handleStatusChange = (orderId, newStatus) => {
+        // NOTE: Changing status does not update the sheet in this version.
+        setOrders(orders.map(o => o.id === orderId ? { ...o, fulfillmentStatus: newStatus } : o));
+    }
     
     return (<div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md">
     <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4"><h2 className="text-xl font-semibold text-gray-900 dark:text-white">Zarządzanie Zamówieniami</h2><div className="flex items-center gap-2 flex-wrap"><button className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 text-sm" onClick={() => openForm()}><PlusCircle className="mr-2 h-4 w-4"/> Dodaj Zamówienie</button></div></div>
@@ -335,7 +380,28 @@ const Products = ({ products, setProducts }) => {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const openForm = (product = null) => { setSelectedProduct(product); setIsFormOpen(true); };
     const closeForm = () => { setSelectedProduct(null); setIsFormOpen(false); };
-    const handleSaveProduct = (productData) => { if (selectedProduct) { setProducts(products.map(p => p.id === selectedProduct.id ? { ...p, ...productData } : p)); } else { const newProduct = { id: `PROD-${Date.now()}`, ...productData }; setProducts([newProduct, ...products]); } closeForm(); };
+    const handleSaveProduct = (productData) => { 
+        let finalProduct;
+        if (selectedProduct) { 
+            // NOTE: Editing an product does not update the sheet in this version.
+            finalProduct = { ...selectedProduct, ...productData };
+            setProducts(products.map(p => p.id === selectedProduct.id ? finalProduct : p)); 
+        } else { 
+            finalProduct = { id: `PROD-${Date.now()}`, ...productData };
+            const sheetData = [
+                finalProduct.id,
+                finalProduct.name,
+                finalProduct.type,
+                finalProduct.weight,
+                finalProduct.price,
+                finalProduct.cost,
+                finalProduct.stock
+            ];
+            saveDataToSheet('Produkty', sheetData);
+            setProducts([finalProduct, ...products]); 
+        } 
+        closeForm(); 
+    };
     return (<div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"><div className="flex justify-between items-center mb-6"><h2 className="text-xl font-semibold text-gray-900 dark:text-white">Baza Produktów</h2><button onClick={() => openForm()} className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"><PlusCircle className="mr-2 h-4 w-4"/> Dodaj Produkt</button></div><div className="overflow-x-auto"><table className="w-full text-sm text-left text-gray-600 dark:text-gray-300"><thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700/50"><tr><th scope="col" className="px-6 py-3">Nazwa</th><th scope="col" className="px-6 py-3">Waga</th><th scope="col" className="px-6 py-3">Cena</th><th scope="col" className="px-6 py-3">Koszt</th><th scope="col" className="px-6 py-3">Stan</th><th scope="col" className="px-6 py-3"><span className="sr-only">Edit</span></th></tr></thead><tbody>{products.length > 0 ? products.map(p => (<tr key={p.id} className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
         <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{p.name}</td><td className="px-6 py-4">{p.weight}</td><td className="px-6 py-4">{p.price.toFixed(2)} zł</td><td className="px-6 py-4">{p.cost.toFixed(2)} zł</td><td className={`px-6 py-4 font-bold ${p.stock <= 10 ? 'text-red-500' : 'text-green-500'}`}>{p.stock}</td><td className="px-6 py-4 text-right"><button onClick={() => openForm(p)} className="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edytuj</button></td></tr>)) : (<tr><td colSpan="6" className="text-center py-10 text-gray-500 dark:text-gray-400">Brak produktów.</td></tr>)}</tbody></table></div>{isFormOpen && <ProductForm product={selectedProduct} onSave={handleSaveProduct} onClose={closeForm} />}</div>);
 };
@@ -376,8 +442,6 @@ const Pasieka = ({ resources, setResources }) => {
 
     const handleAddCategory = () => {
         if (newCategory && !availableCategories.includes(newCategory)) {
-           // This just adds the category visually for now
-           // A more robust solution would update a separate state for categories
            setResources([...resources, {id: Date.now(), name: `Nowy pusty element w ${newCategory}`, category: newCategory, type: 'Folder', icon: 'Folder' }]);
            setNewCategory('');
         }
