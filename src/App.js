@@ -1,13 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-// ***** POCZĄTEK POPRAWKI BŁĘDU *****
-import { Sun, Moon, Menu, X, PlusCircle, User, ShoppingCart, Package, DollarSign, ListOrdered, BarChart2, Trash2 } from 'lucide-react';
-// ***** KONIEC POPRAWKI BŁĘDU *****
+import { Sun, Moon, Menu, X, PlusCircle, User, ShoppingCart, Package, DollarSign, ListOrdered, BarChart2, Trash2, MessageSquare, Send, Bot, Loader2 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, setDoc } from 'firebase/firestore';
 
 // --- KONFIGURACJA FIREBASE ---
-// Zastąp ten obiekt swoją konfiguracją z projektu Firebase
+// Twoja konfiguracja z projektu Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyA6f81G0KL1yCWYR_3bRYZt-DtFqUMRhqM",
   authDomain: "panel-sprzedazy-db.firebaseapp.com",
@@ -120,7 +118,9 @@ const Orders = ({ orders, products, customers }) => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const handleSaveOrder = async (orderData) => {
         const total = orderData.products.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const finalOrder = { date: new Date().toISOString(), paymentStatus: 'Oczekuje na płatność', fulfillmentStatus: 'Nowe', ...orderData, total };
+        // Remove non-serializable fields before saving
+        const sanitizedProducts = orderData.products.map(({ id, ...rest }) => rest);
+        const finalOrder = { date: new Date().toISOString(), paymentStatus: 'Oczekuje na płatność', fulfillmentStatus: 'Nowe', ...orderData, products: sanitizedProducts, total };
         await addDoc(collection(db, "orders"), finalOrder);
         const customerRef = doc(db, "customers", orderData.customerName.toLowerCase());
         const customer = customers.find(c => c.id === orderData.customerName.toLowerCase());
@@ -139,23 +139,81 @@ const Customers = ({ customers }) => ( <div className="bg-white dark:bg-gray-800
 const ProductForm = ({ onSave, onClose }) => { const [formData, setFormData] = useState({ name: '', price: '', cost: '', stock: '', type: 'Miód', weight: '' }); const handleChange = (e) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value })); }; const handleSubmit = (e) => { e.preventDefault(); onSave({ ...formData, price: parseFloat(formData.price) || 0, cost: parseFloat(formData.cost) || 0, stock: parseInt(formData.stock, 10) || 0, }); onClose();}; return (<div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4"><div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 sm:p-8 w-full max-w-md"><h2 className="text-2xl font-bold mb-6">Dodaj Nowy Produkt</h2><form onSubmit={handleSubmit} className="space-y-4"><InputField label="Nazwa Produktu" name="name" value={formData.name} onChange={handleChange} required /><SelectField label="Typ Produktu" name="type" value={formData.type} onChange={handleChange} options={PRODUCT_TYPES} /><InputField label="Waga (np. 1kg, 250g)" name="weight" value={formData.weight} onChange={handleChange} /><InputField label="Cena (zł)" name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} required /><InputField label="Koszt (zł)" name="cost" type="number" step="0.01" value={formData.cost} onChange={handleChange} /><InputField label="Ilość w Magazynie" name="stock" type="number" value={formData.stock} onChange={handleChange} /><div className="flex justify-end gap-4 pt-4"><button type="button" onClick={onClose} className="py-2 px-4 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-white rounded-lg">Anuluj</button><button type="submit" className="py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg">Zapisz</button></div></form></div></div>); };
 const Products = ({ products }) => { const [isFormOpen, setIsFormOpen] = useState(false); const handleSaveProduct = async (productData) => { await addDoc(collection(db, "products"), productData); }; return (<div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md"><div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4"><h2 className="text-xl font-semibold">Produkty</h2><button onClick={() => setIsFormOpen(true)} className="w-full sm:w-auto flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg"><PlusCircle className="mr-2 h-4 w-4"/> Dodaj Produkt</button></div><div className="overflow-x-auto"><table className="w-full text-sm text-left"> <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700/50"><tr>{['Nazwa', 'Waga', 'Cena', 'Stan'].map(h => <th key={h} scope="col" className="px-4 py-3">{h}</th>)}</tr></thead> <tbody>{products.map(p => (<tr key={p.id} className="border-b border-gray-200 dark:border-gray-700"> <td className="px-4 py-3 font-medium">{p.name}</td><td className="px-4 py-3">{p.weight}</td><td className="px-4 py-3">{p.price.toFixed(2)} zł</td><td className={`px-4 py-3 font-bold ${p.stock <= 10 ? 'text-red-500' : 'text-green-500'}`}>{p.stock}</td></tr>))}</tbody></table></div>{isFormOpen && <ProductForm onSave={handleSaveProduct} onClose={() => setIsFormOpen(false)} />}</div>); };
 
-// --- MAIN APP COMPONENT ---
+// --- KOMPONENT CHATBOTA ---
+const Chatbot = ({ allData, isVisible, onClose }) => {
+    const [messages, setMessages] = useState([{ sender: 'ai', text: 'Cześć! Jestem Twoim asystentem. Zapytaj mnie o dane z Twojej bazy.' }]);
+    const [input, setInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const messagesEndRef = useRef(null);
+    useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }) }, [messages]);
+
+    const handleSend = async () => {
+        if (!input.trim()) return;
+        const userMessage = { sender: 'user', text: input };
+        setMessages(prev => [...prev, userMessage]);
+        setInput('');
+        setIsLoading(true);
+
+        try {
+            const response = await fetch('/api/ask-ai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: input, context: allData }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Błąd odpowiedzi od AI');
+            setMessages(prev => [...prev, { sender: 'ai', text: result.answer }]);
+        } catch (error) {
+            setMessages(prev => [...prev, { sender: 'ai', text: `Przepraszam, wystąpił błąd: ${error.message}` }]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    if (!isVisible) return null;
+
+    return (
+        <div className="fixed bottom-20 right-5 sm:right-10 w-[calc(100%-2.5rem)] sm:w-96 h-[70vh] sm:h-[60vh] bg-white dark:bg-gray-800 rounded-lg shadow-2xl flex flex-col z-40">
+            <header className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="font-semibold text-lg flex items-center gap-2"><Bot/> Asystent AI</h3>
+                <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"><X size={20}/></button>
+            </header>
+            <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                {messages.map((msg, index) => (
+                    <div key={index} className={`flex items-start gap-3 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
+                        {msg.sender === 'ai' && <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shrink-0"><Bot size={20} className="text-white"/></div>}
+                        <div className={`max-w-[80%] p-3 rounded-lg ${msg.sender === 'ai' ? 'bg-gray-100 dark:bg-gray-700' : 'bg-blue-500 text-white'}`}>{msg.text}</div>
+                    </div>
+                ))}
+                 {isLoading && <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shrink-0"><Bot size={20} className="text-white"/></div><div className="max-w-[80%] p-3 rounded-lg bg-gray-100 dark:bg-gray-700"><Loader2 className="animate-spin" /></div></div>}
+                <div ref={messagesEndRef} />
+            </div>
+            <footer className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2">
+                    <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()} placeholder="Zadaj pytanie..." className="w-full bg-gray-100 dark:bg-gray-600 border-none rounded-lg py-2 px-3 focus:ring-2 focus:ring-blue-500" />
+                    <button onClick={handleSend} className="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400" disabled={isLoading}><Send/></button>
+                </div>
+            </footer>
+        </div>
+    );
+};
+
+// --- GŁÓWNY KOMPONENT APLIKACJI ---
 export default function App() {
     const [activePage, setActivePage] = useState('Zamówienia');
     const [theme, setTheme] = useState('light');
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [isChatVisible, setChatVisible] = useState(false);
     
     const [orders, setOrders] = useState([]);
     const [products, setProducts] = useState([]);
     const [customers, setCustomers] = useState([]);
-
+    
     useEffect(() => {
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme) {
-            setTheme(savedTheme);
-        }
-        document.documentElement.className = savedTheme || 'light';
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        setTheme(savedTheme);
+        document.documentElement.className = savedTheme;
     }, []);
 
     useEffect(() => {
@@ -164,22 +222,15 @@ export default function App() {
     }, [theme]);
 
     useEffect(() => {
-        const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
-            setOrders(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
-            setIsLoading(false);
-        });
-        const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => {
-            setProducts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
-        });
-        const unsubCustomers = onSnapshot(collection(db, "customers"), (snapshot) => {
-            setCustomers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
-        });
-
-        return () => {
-            unsubOrders();
-            unsubProducts();
-            unsubCustomers();
-        };
+        const unsubscribers = [
+            onSnapshot(collection(db, "orders"), (snapshot) => setOrders(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })))),
+            onSnapshot(collection(db, "products"), (snapshot) => setProducts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })))),
+            onSnapshot(collection(db, "customers"), (snapshot) => setCustomers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }))))
+        ];
+        setIsLoading(false);
+        // ***** POCZĄTEK POPRAWKI BŁĘDU *****
+        return () => unsubscribers.forEach(unsub => unsub());
+        // ***** KONIEC POPRAWKI BŁĘDU *****
     }, []);
     
     const renderPage = () => {
@@ -213,7 +264,10 @@ export default function App() {
                 </header>
                 {renderPage()}
             </main>
+             <Chatbot allData={{ orders, products, customers }} isVisible={isChatVisible} onClose={() => setChatVisible(false)} />
+            <button onClick={() => setChatVisible(v => !v)} className="fixed bottom-5 right-5 sm:right-10 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-transform hover:scale-110 z-30">
+                <MessageSquare size={24}/>
+            </button>
         </div>
     );
 }
-
