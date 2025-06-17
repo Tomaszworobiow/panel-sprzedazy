@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { Sun, Moon, Menu, X, PlusCircle, User, ShoppingCart, Package, DollarSign, ListOrdered, BarChart2, MessageSquare, Send, Bot, Loader2 } from 'lucide-react';
+// ***** POCZĄTEK POPRAWKI BŁĘDU *****
+import { Sun, Moon, Menu, X, PlusCircle, User, ShoppingCart, Package, DollarSign, ListOrdered, BarChart2, Trash2 } from 'lucide-react';
+// ***** KONIEC POPRAWKI BŁĘDU *****
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, setDoc } from 'firebase/firestore';
 
 // --- KONFIGURACJA FIREBASE ---
-// Twoja konfiguracja z projektu Firebase
+// Zastąp ten obiekt swoją konfiguracją z projektu Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyA6f81G0KL1yCWYR_3bRYZt-DtFqUMRhqM",
   authDomain: "panel-sprzedazy-db.firebaseapp.com",
@@ -20,7 +22,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 
-// --- UTILITY FUNCTIONS & UI COMPONENTS (bez zmian) ---
+// --- UTILITY FUNCTIONS & UI COMPONENTS ---
 const getStatusColorClasses = (status) => {
     switch (status) {
         case 'Nowe': return 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300';
@@ -41,7 +43,8 @@ const InputField = ({ label, ...props }) => (<div><label htmlFor={props.name} cl
 const SelectField = ({ label, options, ...props }) => (<div><label htmlFor={props.name} className="block text-sm font-medium mb-1">{label}</label><select {...props} className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500">{options.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>);
 
 
-// --- PAGE COMPONENTS (bez większych zmian, tylko poprawki wizualne) ---
+// --- PAGE COMPONENTS ---
+
 const Dashboard = ({ orders, products, theme }) => {
     const chartData = useMemo(() => {
         const relevantOrders = orders.filter(o => ['Opłacone', 'Zakończone', 'Wysłane'].includes(o.fulfillmentStatus));
@@ -136,81 +139,11 @@ const Customers = ({ customers }) => ( <div className="bg-white dark:bg-gray-800
 const ProductForm = ({ onSave, onClose }) => { const [formData, setFormData] = useState({ name: '', price: '', cost: '', stock: '', type: 'Miód', weight: '' }); const handleChange = (e) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value })); }; const handleSubmit = (e) => { e.preventDefault(); onSave({ ...formData, price: parseFloat(formData.price) || 0, cost: parseFloat(formData.cost) || 0, stock: parseInt(formData.stock, 10) || 0, }); onClose();}; return (<div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4"><div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 sm:p-8 w-full max-w-md"><h2 className="text-2xl font-bold mb-6">Dodaj Nowy Produkt</h2><form onSubmit={handleSubmit} className="space-y-4"><InputField label="Nazwa Produktu" name="name" value={formData.name} onChange={handleChange} required /><SelectField label="Typ Produktu" name="type" value={formData.type} onChange={handleChange} options={PRODUCT_TYPES} /><InputField label="Waga (np. 1kg, 250g)" name="weight" value={formData.weight} onChange={handleChange} /><InputField label="Cena (zł)" name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} required /><InputField label="Koszt (zł)" name="cost" type="number" step="0.01" value={formData.cost} onChange={handleChange} /><InputField label="Ilość w Magazynie" name="stock" type="number" value={formData.stock} onChange={handleChange} /><div className="flex justify-end gap-4 pt-4"><button type="button" onClick={onClose} className="py-2 px-4 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-white rounded-lg">Anuluj</button><button type="submit" className="py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg">Zapisz</button></div></form></div></div>); };
 const Products = ({ products }) => { const [isFormOpen, setIsFormOpen] = useState(false); const handleSaveProduct = async (productData) => { await addDoc(collection(db, "products"), productData); }; return (<div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md"><div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4"><h2 className="text-xl font-semibold">Produkty</h2><button onClick={() => setIsFormOpen(true)} className="w-full sm:w-auto flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg"><PlusCircle className="mr-2 h-4 w-4"/> Dodaj Produkt</button></div><div className="overflow-x-auto"><table className="w-full text-sm text-left"> <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700/50"><tr>{['Nazwa', 'Waga', 'Cena', 'Stan'].map(h => <th key={h} scope="col" className="px-4 py-3">{h}</th>)}</tr></thead> <tbody>{products.map(p => (<tr key={p.id} className="border-b border-gray-200 dark:border-gray-700"> <td className="px-4 py-3 font-medium">{p.name}</td><td className="px-4 py-3">{p.weight}</td><td className="px-4 py-3">{p.price.toFixed(2)} zł</td><td className={`px-4 py-3 font-bold ${p.stock <= 10 ? 'text-red-500' : 'text-green-500'}`}>{p.stock}</td></tr>))}</tbody></table></div>{isFormOpen && <ProductForm onSave={handleSaveProduct} onClose={() => setIsFormOpen(false)} />}</div>); };
 
-// --- NOWY KOMPONENT: CHATBOT ---
-const Chatbot = ({ allData, isVisible, onClose }) => {
-    const [messages, setMessages] = useState([{ sender: 'ai', text: 'Cześć! Jestem Twoim asystentem. Zapytaj mnie o dane z Twojej bazy.' }]);
-    const [input, setInput] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const messagesEndRef = useRef(null);
-
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
-
-    useEffect(scrollToBottom, [messages]);
-
-    const handleSend = async () => {
-        if (!input.trim()) return;
-        const userMessage = { sender: 'user', text: input };
-        setMessages(prev => [...prev, userMessage]);
-        setInput('');
-        setIsLoading(true);
-
-        try {
-            const response = await fetch('/api/ask-ai', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: input, context: allData }),
-            });
-            const result = await response.json();
-            if (!response.ok) {
-                throw new Error(result.error || 'Błąd odpowiedzi od AI');
-            }
-            const aiMessage = { sender: 'ai', text: result.answer };
-            setMessages(prev => [...prev, aiMessage]);
-        } catch (error) {
-            const errorMessage = { sender: 'ai', text: `Przepraszam, wystąpił błąd: ${error.message}` };
-            setMessages(prev => [...prev, errorMessage]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    if (!isVisible) return null;
-
-    return (
-        <div className="fixed bottom-20 right-5 sm:right-10 w-[calc(100%-2.5rem)] sm:w-96 h-[70vh] sm:h-[60vh] bg-white dark:bg-gray-800 rounded-lg shadow-2xl flex flex-col z-40">
-            <header className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="font-semibold text-lg flex items-center gap-2"><Bot/> Asystent AI</h3>
-                <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"><X size={20}/></button>
-            </header>
-            <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                {messages.map((msg, index) => (
-                    <div key={index} className={`flex items-start gap-3 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
-                        {msg.sender === 'ai' && <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shrink-0"><Bot size={20} className="text-white"/></div>}
-                        <div className={`max-w-[80%] p-3 rounded-lg ${msg.sender === 'ai' ? 'bg-gray-100 dark:bg-gray-700' : 'bg-blue-500 text-white'}`}>{msg.text}</div>
-                    </div>
-                ))}
-                 {isLoading && <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shrink-0"><Bot size={20} className="text-white"/></div><div className="max-w-[80%] p-3 rounded-lg bg-gray-100 dark:bg-gray-700"><Loader2 className="animate-spin" /></div></div>}
-                <div ref={messagesEndRef} />
-            </div>
-            <footer className="p-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2">
-                    <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()} placeholder="Zadaj pytanie..." className="w-full bg-gray-100 dark:bg-gray-600 border-none rounded-lg py-2 px-3 focus:ring-2 focus:ring-blue-500" />
-                    <button onClick={handleSend} className="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400" disabled={isLoading}><Send/></button>
-                </div>
-            </footer>
-        </div>
-    );
-};
-
-
 // --- MAIN APP COMPONENT ---
 export default function App() {
-    const [activePage, setActivePage] = useState('Panel Główny');
+    const [activePage, setActivePage] = useState('Zamówienia');
     const [theme, setTheme] = useState('light');
     const [isSidebarOpen, setSidebarOpen] = useState(false);
-    const [isChatVisible, setChatVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     
     const [orders, setOrders] = useState([]);
@@ -219,21 +152,34 @@ export default function App() {
 
     useEffect(() => {
         const savedTheme = localStorage.getItem('theme');
-        if (savedTheme) setTheme(savedTheme);
-        else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+        if (savedTheme) {
+            setTheme(savedTheme);
+        }
+        document.documentElement.className = savedTheme || 'light';
     }, []);
-    
+
     useEffect(() => {
         document.documentElement.className = theme;
         localStorage.setItem('theme', theme);
     }, [theme]);
 
     useEffect(() => {
-        const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => setOrders(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }))));
-        const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => setProducts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }))));
-        const unsubCustomers = onSnapshot(collection(db, "customers"), (snapshot) => setCustomers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }))));
-        setIsLoading(false);
-        return () => { unsubOrders(); unsubProducts(); unsubCustomers(); };
+        const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
+            setOrders(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+            setIsLoading(false);
+        });
+        const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => {
+            setProducts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+        });
+        const unsubCustomers = onSnapshot(collection(db, "customers"), (snapshot) => {
+            setCustomers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+        });
+
+        return () => {
+            unsubOrders();
+            unsubProducts();
+            unsubCustomers();
+        };
     }, []);
     
     const renderPage = () => {
@@ -247,31 +193,27 @@ export default function App() {
         }
     };
 
-    const NavItem = ({ label, icon, isActive, onClick }) => (<li><a href="#" onClick={onClick} className={`flex items-center p-3 rounded-lg transition-colors ${isActive ? 'bg-gray-200 dark:bg-gray-700 font-bold text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>{icon} <span className="ml-3">{label}</span></a></li>);
+    const NavItem = ({ label, icon, isActive, onClick }) => (<li><a href="#" onClick={onClick} className={`flex items-center p-3 rounded-lg transition-colors ${isActive ? 'bg-gray-200 dark:bg-gray-700 font-bold' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>{icon} <span className="ml-3">{label}</span></a></li>);
     const menuItems = [ { label: 'Panel Główny', icon: <BarChart2 className="w-5 h-5"/> }, { label: 'Zamówienia', icon: <ShoppingCart className="w-5 h-5"/> }, { label: 'Klienci', icon: <User className="w-5 h-5"/> }, { label: 'Produkty', icon: <Package className="w-5 h-5"/> } ];
 
     return (
         <div className={`bg-gray-100 dark:bg-gray-900 min-h-screen font-sans flex text-gray-900 dark:text-white ${theme}`}>
             {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setSidebarOpen(false)}></div>}
             <aside className={`w-64 bg-white dark:bg-gray-800 flex-shrink-0 p-4 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:flex flex-col fixed md:relative h-full z-30 transition-transform duration-300 ease-in-out shadow-lg`}>
-                <div className="text-gray-900 dark:text-white text-2xl font-bold p-3 mb-5 text-center">Panel Sprzedaży</div>
+                <div className="text-2xl font-bold p-3 mb-5 text-center">Panel Sprzedaży</div>
                 <nav className="flex-1"><ul>{menuItems.map(item => <NavItem key={item.label} {...item} isActive={activePage === item.label} onClick={() => {setActivePage(item.label); setSidebarOpen(false);}} />)}</ul></nav>
             </aside>
             <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
                 <header className="flex justify-between items-center mb-8">
-                    <div className="flex items-center"><button onClick={() => setSidebarOpen(!isSidebarOpen)} className="md:hidden mr-4 text-gray-600 dark:text-gray-300"><Menu className="h-6 w-6" /></button><h1 className="text-2xl sm:text-3xl font-bold">{activePage}</h1></div>
+                    <div className="flex items-center"><button onClick={() => setSidebarOpen(!isSidebarOpen)} className="md:hidden mr-4"><Menu className="h-6 w-6" /></button><h1 className="text-2xl sm:text-3xl font-bold">{activePage}</h1></div>
                     <div className="flex items-center space-x-4">
-                        <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors">{theme === 'dark' ? <Sun className="h-6 w-6"/> : <Moon className="h-6 w-6"/>}</button>
+                        <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="text-gray-500 dark:text-gray-400">{theme === 'dark' ? <Sun className="h-6 w-6"/> : <Moon className="h-6 w-6"/>}</button>
                         <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center font-bold text-white">TW</div>
                     </div>
                 </header>
                 {renderPage()}
             </main>
-            {/* Przycisk i okno chatbota */}
-            <Chatbot allData={{ orders, products, customers }} isVisible={isChatVisible} onClose={() => setChatVisible(false)} />
-            <button onClick={() => setChatVisible(v => !v)} className="fixed bottom-5 right-5 sm:right-10 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-transform hover:scale-110 z-30">
-                <MessageSquare size={24}/>
-            </button>
         </div>
     );
 }
+
