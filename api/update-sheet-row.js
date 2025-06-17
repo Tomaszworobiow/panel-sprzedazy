@@ -32,12 +32,12 @@ export default async function handler(req, res) {
 
         const rows = getRowsResponse.data.values;
         if (!rows || rows.length === 0) {
-            return res.status(404).json({ error: 'Sheet not found' });
+            return res.status(404).json({ error: 'Sheet not found or empty' });
         }
 
         const rowIndex = rows.findIndex(row => row[0] === id);
         if (rowIndex === -1) {
-            return res.status(404).json({ error: `ID '${id}' not found` });
+            return res.status(404).json({ error: `ID '${id}' not found in sheet '${sheetName}'` });
         }
 
         const rowNumber = rowIndex + 1;
@@ -55,4 +55,3 @@ export default async function handler(req, res) {
         res.status(500).json({ error: 'Nie udało się zaktualizować danych.', details: error.message });
     }
 }
-

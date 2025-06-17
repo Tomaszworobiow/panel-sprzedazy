@@ -1,4 +1,4 @@
-onst { google } = require('googleapis');
+const { google } = require('googleapis');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -20,7 +20,6 @@ export default async function handler(req, res) {
 
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // Przechwytujemy odpowiedź od Google
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
       range: `${sheetName}!A1`,
@@ -30,19 +29,10 @@ export default async function handler(req, res) {
       },
     });
 
-    // NOWE, SZCZEGÓŁOWE LOGOWANIE
-    console.log('ODPOWIEDŹ Z GOOGLE API:', JSON.stringify(response.data, null, 2));
-
-    res.status(200).json({ 
-        message: 'Success, check logs for Google API Response', 
-        googleResponse: response.data 
-    });
+    res.status(200).json({ googleResponse: response.data });
 
   } catch (error) {
     console.error('BŁĄD ZAPISU DO ARKUSZA:', error.message);
-    res.status(500).json({ 
-      error: 'Nie udało się zapisać danych do arkusza.', 
-      details: error.message 
-    });
+    res.status(500).json({ error: 'Nie udało się zapisać danych do arkusza.', details: error.message });
   }
 }
