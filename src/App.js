@@ -70,7 +70,8 @@ const saveDataToSheet = (sheetName, data) => {
 // --- PAGE COMPONENTS ---
 
 const Dashboard = ({ orders, customers, products, theme, setActivePage }) => {
-    const { totalRevenue, profit, salesData, productSalesData } = useMemo(() => {
+    // ***** POCZĄTEK POPRAWKI BŁĘDU *****
+    const chartData = useMemo(() => {
         const relevantOrders = orders.filter(o => ['Opłacone', 'Zakończone', 'Wysłane'].includes(o.fulfillmentStatus));
         const revenue = relevantOrders.reduce((sum, order) => sum + order.total, 0);
         const cost = relevantOrders.flatMap(o => o.products || []).reduce((sum, item) => {
@@ -102,6 +103,11 @@ const Dashboard = ({ orders, customers, products, theme, setActivePage }) => {
 
         return { totalRevenue: revenue, profit: revenue - cost, salesData, sellerData, productSalesData };
     }, [orders, products]);
+    
+    // Destructuring after calculations to ensure they are available
+    const { totalRevenue, profit, salesData, sellerData, productSalesData } = chartData;
+    // ***** KONIEC POPRAWKI BŁĘDU *****
+
 
     const numberOfOrders = orders.length;
     const paidOrdersCount = orders.filter(o => o.paymentStatus === 'Opłacone').length;
